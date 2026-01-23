@@ -57,7 +57,6 @@ const MSMEForm = () => {
   const { find, add, update, isLoading } = useMSMEStore();
 
   const isEditMode = Boolean(editGstin);
-  const existingRecord = isEditMode ? find(editGstin!) : null;
 
   // Form state
   const [gstin, setGstin] = useState(editGstin || prefillGstin);
@@ -71,20 +70,29 @@ const MSMEForm = () => {
 
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Load existing record if editing
+  // Load existing record AFTER store is initialized (critical for edit mode)
   useEffect(() => {
-    if (existingRecord) {
-      setGstin(existingRecord.gstin);
-      setBusinessName(existingRecord.business_name);
-      setEstablishedYear(existingRecord.established_year.toString());
-      setGstCompliance(existingRecord.gst_compliance);
-      setUtilityPunctuality(existingRecord.utility_punctuality);
-      setUpiFrequency(existingRecord.upi_frequency);
-      setDigitalPresence(existingRecord.digital_presence);
-      setLocationStability(existingRecord.location_stability);
+    if (isLoading || dataLoaded) return;
+    
+    if (isEditMode && editGstin) {
+      const existingRecord = find(editGstin);
+      if (existingRecord) {
+        setGstin(existingRecord.gstin);
+        setBusinessName(existingRecord.business_name);
+        setEstablishedYear(existingRecord.established_year.toString());
+        setGstCompliance(existingRecord.gst_compliance);
+        setUtilityPunctuality(existingRecord.utility_punctuality);
+        setUpiFrequency(existingRecord.upi_frequency);
+        setDigitalPresence(existingRecord.digital_presence);
+        setLocationStability(existingRecord.location_stability);
+        setDataLoaded(true);
+      }
+    } else {
+      setDataLoaded(true);
     }
-  }, [existingRecord]);
+  }, [isLoading, isEditMode, editGstin, find, dataLoaded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
