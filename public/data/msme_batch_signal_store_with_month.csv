@@ -1,0 +1,16 @@
+gstin,business_name,established_year,gst_compliance,utility_punctuality,upi_frequency,digital_presence,location_stability,last_updated
+29ABCDE1234F1Z5,Sri Sai Traders,2018,on_time,on_time,high,strong,stable,10 Jan 2026
+36PQRSX5678K1Z2,Ravi Kirana Store,2020,occasionally_late,sometimes_late,medium,basic,stable,09 Jan 2026
+27LMNOP4321Q1Z9,Shiva Electricals,2016,on_time,on_time,high,strong,stable,08 Jan 2026
+19ZXCVB9876R1Z3,GreenLeaf Foods,2021,occasionally_late,on_time,medium,basic,changed_once,07 Jan 2026
+33QWERT1122M1Z7,Ram & Sons Hardware,2014,on_time,on_time,high,strong,stable,10 Jan 2026
+24ASDFG5566T1Z8,Metro Mobile Shop,2019,frequently_late,often_late,low,none,unstable,06 Jan 2026
+07POIUY8899A1Z4,Narmada Textiles,2017,on_time,sometimes_late,medium,basic,stable,09 Jan 2026
+22LKJHG3344S1Z6,Sunrise Bakery,2022,occasionally_late,on_time,medium,basic,changed_once,05 Jan 2026
+18MNBVC9988F1Z1,Akash Auto Parts,2015,on_time,on_time,high,strong,stable,10 Jan 2026
+10REWQX7766D1Z0,QuickFix Plumbing,2020,frequently_late,sometimes_late,low,none,changed_once,04 Jan 2026
+09YTREW5544C1Z9,Fresh Farm Mart,2019,on_time,on_time,medium,basic,stable,08 Jan 2026
+28PLMKO6677V1Z2,Om Sai Construction,2013,on_time,on_time,high,strong,stable,10 Jan 2026
+21NBVCA2233J1Z5,City Cycle Store,2021,occasionally_late,sometimes_late,medium,basic,changed_once,06 Jan 2026
+14HGFDS4455L1Z7,TechZone Computers,2018,on_time,on_time,high,strong,stable,09 Jan 2026
+32EDCBA7788K1Z8,Royal Furniture Works,2016,frequently_late,often_late,low,none,unstable,05 Jan 2026
