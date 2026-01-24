@@ -1,4 +1,4 @@
-# Welcome to your Lovable project
+# Welcome to your Msme Credit Score Evaluator project
 
 ## Project info
 
