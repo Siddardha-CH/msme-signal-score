@@ -182,7 +182,6 @@ const Index = () => {
       <footer className="border-t border-border mt-auto">
         <div className="container mx-auto px-4 py-6">
           <p className="text-xs text-muted-foreground text-center max-w-2xl mx-auto">
-            This is a hackathon MVP. In production, this CSV-backed signal store would be fed automatically via GST verification APIs, Account Aggregator framework, and utility partners.
           </p>
         </div>
       </footer>
