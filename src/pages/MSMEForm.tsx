@@ -9,7 +9,9 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Shield, ArrowLeft, Save, AlertCircle, Info, Lock } from 'lucide-react';
 import { useMSMEStore } from '@/hooks/use-msme-store';
+import { useAuthStore } from '@/hooks/use-auth';
 import { isValidGSTIN } from '@/lib/csv-store';
+import { motion } from 'framer-motion';
 import {
   GstCompliance,
   UtilityPunctuality,
@@ -55,6 +57,9 @@ const MSMEForm = () => {
   const [searchParams] = useSearchParams();
   const prefillGstin = searchParams.get('gstin') || '';
   const { find, add, update, isLoading } = useMSMEStore();
+  const { isAdmin } = useAuthStore();
+  
+  const isReadOnly = !isAdmin();
 
   const isEditMode = Boolean(editGstin);
 
@@ -68,27 +73,42 @@ const MSMEForm = () => {
   const [digitalPresence, setDigitalPresence] = useState<DigitalPresence>('basic');
   const [locationStability, setLocationStability] = useState<LocationStability>('stable');
 
+  // NEW SIGNALS
+  const [avgMonthlyBalance, setAvgMonthlyBalance] = useState('100000');
+  const [bounceRatePercent, setBounceRatePercent] = useState('0');
+  const [itrFiledLastYear, setItrFiledLastYear] = useState('true');
+  const [bureauVintageMonths, setBureauVintageMonths] = useState('24');
+  const [monthlyRevenueTrend, setMonthlyRevenueTrend] = useState<'growing' | 'stable' | 'declining'>('stable');
+
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Load existing record AFTER store is initialized (critical for edit mode)
+  // Load existing record AFTER store is initialized
   useEffect(() => {
     if (isLoading || dataLoaded) return;
     
     if (isEditMode && editGstin) {
-      const existingRecord = find(editGstin);
-      if (existingRecord) {
-        setGstin(existingRecord.gstin);
-        setBusinessName(existingRecord.business_name);
-        setEstablishedYear(existingRecord.established_year.toString());
-        setGstCompliance(existingRecord.gst_compliance);
-        setUtilityPunctuality(existingRecord.utility_punctuality);
-        setUpiFrequency(existingRecord.upi_frequency);
-        setDigitalPresence(existingRecord.digital_presence);
-        setLocationStability(existingRecord.location_stability);
-        setDataLoaded(true);
-      }
+      const loadRecord = async () => {
+        const existingRecord = await find(editGstin);
+        if (existingRecord) {
+          setGstin(existingRecord.gstin);
+          setBusinessName(existingRecord.business_name);
+          setEstablishedYear(existingRecord.established_year.toString());
+          setGstCompliance(existingRecord.gst_compliance);
+          setUtilityPunctuality(existingRecord.utility_punctuality);
+          setUpiFrequency(existingRecord.upi_frequency);
+          setDigitalPresence(existingRecord.digital_presence);
+          setLocationStability(existingRecord.location_stability);
+          setAvgMonthlyBalance(existingRecord.avg_monthly_balance.toString());
+          setBounceRatePercent(existingRecord.bounce_rate_percent.toString());
+          setItrFiledLastYear(existingRecord.itr_filed_last_year.toString());
+          setBureauVintageMonths(existingRecord.bureau_vintage_months.toString());
+          setMonthlyRevenueTrend(existingRecord.monthly_revenue_trend);
+          setDataLoaded(true);
+        }
+      };
+      loadRecord();
     } else {
       setDataLoaded(true);
     }
@@ -123,26 +143,28 @@ const MSMEForm = () => {
 
     setIsSaving(true);
 
+    const commonData = {
+      business_name: businessName.trim(),
+      gst_compliance: gstCompliance,
+      utility_punctuality: utilityPunctuality,
+      upi_frequency: upiFrequency,
+      digital_presence: digitalPresence,
+      location_stability: locationStability,
+      avg_monthly_balance: parseFloat(avgMonthlyBalance) || 0,
+      bounce_rate_percent: parseFloat(bounceRatePercent) || 0,
+      itr_filed_last_year: itrFiledLastYear === 'true',
+      bureau_vintage_months: parseInt(bureauVintageMonths) || 0,
+      monthly_revenue_trend: monthlyRevenueTrend,
+    };
+
     try {
       if (isEditMode) {
-        update(gstin, {
-          business_name: businessName.trim(),
-          gst_compliance: gstCompliance,
-          utility_punctuality: utilityPunctuality,
-          upi_frequency: upiFrequency,
-          digital_presence: digitalPresence,
-          location_stability: locationStability,
-        });
+        await update(gstin, commonData);
       } else {
-        add({
+        await add({
           gstin: gstin.trim().toUpperCase(),
-          business_name: businessName.trim(),
           established_year: year,
-          gst_compliance: gstCompliance,
-          utility_punctuality: utilityPunctuality,
-          upi_frequency: upiFrequency,
-          digital_presence: digitalPresence,
-          location_stability: locationStability,
+          ...commonData
         });
       }
 
@@ -167,33 +189,54 @@ const MSMEForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-950 text-slate-100 overflow-hidden relative">
+      {/* 3D Background Elements */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/20 blur-[120px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/20 blur-[120px]"></div>
+      </div>
+
       {/* Header */}
-      <header className="border-b border-border">
+      <header className="border-b border-slate-800/50 bg-slate-950/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-slate-300 hover:text-white hover:bg-slate-800">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-            <Shield className="w-5 h-5 text-primary-foreground" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg shadow-primary/20">
+            <Shield className="w-5 h-5 text-white" />
           </div>
-          <span className="font-display font-semibold text-lg text-foreground">
+          <span className="font-display font-semibold text-lg text-white">
             {isEditMode ? 'Update MSME' : 'Add New MSME'}
           </span>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
+      <main className="container mx-auto px-4 py-8 max-w-2xl relative z-10">
+        {isReadOnly && (
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-4 shadow-lg shadow-amber-500/5">
+                <Lock className="w-6 h-6 text-amber-500 mt-0.5" />
+                <div>
+                    <h3 className="text-sm font-semibold text-amber-500">View-Only Mode</h3>
+                    <p className="text-sm text-amber-500/80">You do not have administrator privileges. You can view this record but cannot save changes.</p>
+                </div>
+            </motion.div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Info Card */}
-          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm animate-slide-up">
-            <h2 className="text-lg font-semibold text-foreground mb-6">Business Information</h2>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 p-8 rounded-3xl shadow-xl"
+          >
+            <h2 className="text-xl font-semibold text-white mb-6">Business Information</h2>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <Label htmlFor="gstin" className="flex items-center gap-2">
+                <Label htmlFor="gstin" className="flex items-center gap-2 text-slate-300">
                   GSTIN
-                  {isEditMode && <Lock className="w-3 h-3 text-muted-foreground" />}
+                  {isEditMode && <Lock className="w-3 h-3 text-slate-500" />}
                 </Label>
                 <Input
                   id="gstin"
@@ -201,28 +244,29 @@ const MSMEForm = () => {
                   value={gstin}
                   onChange={(e) => setGstin(e.target.value.toUpperCase())}
                   placeholder="e.g., 29ABCDE1234F1Z5"
-                  className="mt-1 font-mono tracking-wider"
+                  className="mt-2 font-mono tracking-wider bg-slate-950/50 border-slate-700 text-white rounded-xl h-12"
                   maxLength={15}
-                  disabled={isEditMode}
+                  disabled={isEditMode || isReadOnly}
                 />
               </div>
 
               <div>
-                <Label htmlFor="businessName">Business Name</Label>
+                <Label htmlFor="businessName" className="text-slate-300">Business Name</Label>
                 <Input
                   id="businessName"
                   type="text"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   placeholder="e.g., Sri Sai Traders"
-                  className="mt-1"
+                  className="mt-2 bg-slate-950/50 border-slate-700 text-white rounded-xl h-12"
+                  disabled={isReadOnly}
                 />
               </div>
 
               <div>
-                <Label htmlFor="establishedYear" className="flex items-center gap-2">
+                <Label htmlFor="establishedYear" className="flex items-center gap-2 text-slate-300">
                   Established Year
-                  {isEditMode && <Lock className="w-3 h-3 text-muted-foreground" />}
+                  {isEditMode && <Lock className="w-3 h-3 text-slate-500" />}
                 </Label>
                 <Input
                   id="establishedYear"
@@ -230,28 +274,34 @@ const MSMEForm = () => {
                   value={establishedYear}
                   onChange={(e) => setEstablishedYear(e.target.value)}
                   placeholder="e.g., 2018"
-                  className="mt-1"
+                  className="mt-2 bg-slate-950/50 border-slate-700 text-white rounded-xl h-12"
                   min={1900}
                   max={new Date().getFullYear()}
-                  disabled={isEditMode}
+                  disabled={isEditMode || isReadOnly}
                 />
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Signal Inputs Card */}
-          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <h2 className="text-lg font-semibold text-foreground mb-6">Operational Signals</h2>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 p-8 rounded-3xl shadow-xl"
+          >
+            <h2 className="text-xl font-semibold text-white mb-6">Operational Signals</h2>
 
-            <div className="space-y-6">
+            <div className="space-y-8">
               {/* GST Compliance */}
               <div>
-                <Label className="text-sm font-medium">GST Compliance</Label>
-                <p className="text-xs text-muted-foreground mb-3">Filing status of GST returns</p>
+                <Label className="text-sm font-medium text-slate-300">GST Compliance</Label>
+                <p className="text-xs text-slate-500 mb-3">Filing status of GST returns</p>
                 <RadioGroup
                   value={gstCompliance}
                   onValueChange={(v) => setGstCompliance(v as GstCompliance)}
-                  className="flex flex-wrap gap-2"
+                  className="flex flex-wrap gap-3"
+                  disabled={isReadOnly}
                 >
                   {GST_OPTIONS.map((opt) => (
                     <div key={opt.value} className="flex items-center">
@@ -359,36 +409,131 @@ const MSMEForm = () => {
                 </RadioGroup>
               </div>
             </div>
-          </div>
+          </motion.div>
+
+          {/* New Financial Signals Card */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 p-8 rounded-3xl shadow-xl"
+          >
+            <h2 className="text-xl font-semibold text-white mb-6">Financial & Behavioral Signals (Live Sync)</h2>
+
+            <div className="space-y-6">
+              <div>
+                <Label htmlFor="avgMonthlyBalance">Average Monthly Balance (₹)</Label>
+                <p className="text-xs text-muted-foreground mb-1">Proxy for Account Aggregator bank statement fetch</p>
+                <Input
+                  id="avgMonthlyBalance"
+                  type="number"
+                  value={avgMonthlyBalance}
+                  onChange={(e) => setAvgMonthlyBalance(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="bounceRatePercent">Cheque Bounce Rate (%)</Label>
+                <p className="text-xs text-muted-foreground mb-1">Critical risk indicator</p>
+                <Input
+                  id="bounceRatePercent"
+                  type="number"
+                  step="0.1"
+                  value={bounceRatePercent}
+                  onChange={(e) => setBounceRatePercent(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium">ITR Filed Last Year?</Label>
+                <RadioGroup
+                  value={itrFiledLastYear}
+                  onValueChange={setItrFiledLastYear}
+                  className="flex flex-wrap gap-2 mt-2"
+                >
+                  <div className="flex items-center">
+                    <RadioGroupItem value="true" id="itr-yes" className="peer sr-only" />
+                    <Label htmlFor="itr-yes" className="px-4 py-2 rounded-lg border border-border cursor-pointer peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 peer-data-[state=checked]:text-primary hover:bg-muted">Yes</Label>
+                  </div>
+                  <div className="flex items-center">
+                    <RadioGroupItem value="false" id="itr-no" className="peer sr-only" />
+                    <Label htmlFor="itr-no" className="px-4 py-2 rounded-lg border border-border cursor-pointer peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 peer-data-[state=checked]:text-primary hover:bg-muted">No</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div>
+                <Label htmlFor="bureauVintageMonths">Credit Bureau Vintage (Months)</Label>
+                <p className="text-xs text-muted-foreground mb-1">How long they've had a credit footprint</p>
+                <Input
+                  id="bureauVintageMonths"
+                  type="number"
+                  value={bureauVintageMonths}
+                  onChange={(e) => setBureauVintageMonths(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium">Monthly Revenue Trend</Label>
+                <RadioGroup
+                  value={monthlyRevenueTrend}
+                  onValueChange={(v: any) => setMonthlyRevenueTrend(v)}
+                  className="flex flex-wrap gap-2 mt-2"
+                >
+                  <div className="flex items-center">
+                    <RadioGroupItem value="growing" id="rev-growing" className="peer sr-only" />
+                    <Label htmlFor="rev-growing" className="px-4 py-2 rounded-lg border border-border cursor-pointer peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 peer-data-[state=checked]:text-primary">Growing</Label>
+                  </div>
+                  <div className="flex items-center">
+                    <RadioGroupItem value="stable" id="rev-stable" className="peer sr-only" />
+                    <Label htmlFor="rev-stable" className="px-4 py-2 rounded-lg border border-border cursor-pointer peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 peer-data-[state=checked]:text-primary">Stable</Label>
+                  </div>
+                  <div className="flex items-center">
+                    <RadioGroupItem value="declining" id="rev-declining" className="peer sr-only" />
+                    <Label htmlFor="rev-declining" className="px-4 py-2 rounded-lg border border-border cursor-pointer peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 peer-data-[state=checked]:text-primary hover:bg-destructive/10 peer-data-[state=checked]:text-destructive peer-data-[state=checked]:border-destructive">Declining</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </div>
+          </motion.div>
 
           {/* Legend Card */}
-          <div className="bg-muted/50 rounded-xl p-4 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            <div className="flex items-start gap-2">
-              <Info className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-              <div className="text-xs text-muted-foreground">
-                <p className="font-medium mb-1">Signal Categories Guide:</p>
-                <ul className="space-y-0.5">
-                  <li>• <strong>On Time / High / Strong / Stable</strong> — Best score impact (+)</li>
-                  <li>• <strong>Occasionally Late / Medium / Basic / Changed Once</strong> — Neutral impact (±)</li>
-                  <li>• <strong>Frequently Late / Low / None / Unstable</strong> — Negative impact (−)</li>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="bg-slate-900/50 rounded-2xl p-6 border border-slate-800/50 shadow-inner"
+          >
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-slate-400">
+                <p className="font-semibold text-slate-300 mb-2">Signal Processing Heuristics:</p>
+                <ul className="space-y-1.5 ml-1">
+                  <li>• <strong>On Time / High / Strong / Stable</strong> — Strong Positive Impact (<span className="text-green-500">+</span>)</li>
+                  <li>• <strong>Occasionally Late / Medium / Basic / Changed Once</strong> — Neutral Adjustments (<span className="text-amber-500">±</span>)</li>
+                  <li>• <strong>Frequently Late / Low / None / Unstable</strong> — Severe Penalty (<span className="text-red-500">−</span>)</li>
                 </ul>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          {/* Error */}
           {error && (
-            <div className="flex items-start gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-200">{error}</p>
+            </motion.div>
           )}
 
           {/* Submit Button */}
-          <Button type="submit" className="w-full h-12 text-base font-medium" size="lg" disabled={isSaving}>
-            <Save className="w-5 h-5 mr-2" />
-            {isSaving ? 'Saving...' : isEditMode ? 'Update & Calculate Score' : 'Save & Calculate Score'}
-          </Button>
+          {!isReadOnly && (
+              <Button type="submit" className="w-full h-14 text-lg font-semibold bg-primary hover:bg-primary/90 text-white rounded-2xl shadow-lg shadow-primary/20 transition-all transform hover:-translate-y-1" disabled={isSaving}>
+                <Save className="w-5 h-5 mr-3" />
+                {isSaving ? 'Processing Cloud Sync...' : isEditMode ? 'Update & Calculate Score' : 'Save & Calculate Score'}
+              </Button>
+          )}
         </form>
       </main>
     </div>

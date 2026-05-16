@@ -15,6 +15,11 @@ export interface MSMERecord {
   upi_frequency: UpiFrequency;
   digital_presence: DigitalPresence;
   location_stability: LocationStability;
+  avg_monthly_balance: number;
+  bounce_rate_percent: number;
+  itr_filed_last_year: boolean;
+  bureau_vintage_months: number;
+  monthly_revenue_trend: 'growing' | 'stable' | 'declining';
   last_updated: string;
 }
 

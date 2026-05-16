@@ -22,6 +22,8 @@ import {
 import { useMSMEStore } from '@/hooks/use-msme-store';
 import { calculateScore, getRelativeTime } from '@/lib/scoring-engine';
 import { ScoreResult, MSMERecord } from '@/lib/types';
+import { fetchMLScore, MLScoreResult } from '@/lib/api';
+import { motion } from 'framer-motion';
 
 // Animated number counter
 const AnimatedNumber = ({ value, duration = 1500 }: { value: number; duration?: number }) => {
@@ -54,23 +56,48 @@ const AnimatedNumber = ({ value, duration = 1500 }: { value: number; duration?: 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { gstin } = useParams<{ gstin: string }>();
-  const { find, isLoading, records } = useMSMEStore();
+  const { findSync, isLoading, records } = useMSMEStore();
   const [record, setRecord] = useState<MSMERecord | null>(null);
+  const [mlData, setMlData] = useState<MLScoreResult | null>(null);
+  const [isLoadingMl, setIsLoadingMl] = useState(true);
 
-  // Find record after data is loaded
+  // Directly fetch from backend API - no cache dependency
   useEffect(() => {
-    if (!isLoading && gstin) {
-      const found = find(gstin);
-      setRecord(found);
-    }
-  }, [isLoading, gstin, find, records]);
+    if (!gstin) return;
+    setIsLoadingMl(true);
+    
+    // Fetch MSME record directly
+    import('@/lib/api').then(({ fetchMSME }) => {
+      fetchMSME(gstin)
+        .then(data => {
+          setRecord(data);
+          // Then fetch ML score
+          return fetchMLScore(gstin);
+        })
+        .then(data => setMlData(data))
+        .catch(err => console.error("Error loading dashboard data:", err))
+        .finally(() => setIsLoadingMl(false));
+    });
+  }, [gstin]);
 
   const scoreResult: ScoreResult | null = useMemo(() => {
     if (!record) return null;
-    return calculateScore(record);
-  }, [record]);
+    
+    // Calculate the base breakdown for display purposes
+    const baseCalculated = calculateScore(record);
+    
+    // Inject the real ML prediction if we have it
+    if (mlData) {
+        return {
+            ...baseCalculated,
+            score: mlData.predicted_score
+        };
+    }
+    
+    return baseCalculated;
+  }, [record, mlData]);
 
-  if (isLoading) {
+  if (isLoading || isLoadingMl) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center gap-4">
@@ -158,30 +185,41 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-950 text-slate-100 overflow-hidden relative">
+      {/* 3D Background Elements */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[120px]"></div>
+        <div className="absolute bottom-[20%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/10 blur-[120px]"></div>
+      </div>
+
       {/* Header */}
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10">
+      <header className="border-b border-slate-800/50 bg-slate-950/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-slate-300 hover:text-white hover:bg-slate-800">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Shield className="w-5 h-5 text-primary-foreground" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg shadow-primary/20">
+              <Shield className="w-5 h-5 text-white" />
             </div>
-            <span className="font-display font-semibold text-lg text-foreground">Credit Score Dashboard</span>
+            <span className="font-display font-semibold text-lg text-white">Credit Score AI</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/msme/edit/${gstin}`)}>
+          <Button variant="outline" size="sm" onClick={() => navigate(`/msme/edit/${gstin}`)} className="border-slate-700 bg-slate-900/50 hover:bg-slate-800 text-slate-300">
             <Edit className="w-4 h-4 mr-2" />
             Update Profile
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-5xl">
+      <main className="container mx-auto px-4 py-8 max-w-5xl relative z-10">
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Card 1: MSME Summary */}
-          <div className="score-card animate-slide-up">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            className="p-6 rounded-3xl bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 shadow-xl"
+          >
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
                 <Building2 className="w-6 h-6 text-accent-foreground" />
@@ -208,13 +246,25 @@ const Dashboard = () => {
                 <span className="text-sm font-medium text-foreground">{getRelativeTime(record.last_updated)}</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          {/* Card 2: Invisible Credit Score */}
-          <div className="score-card animate-slide-up" style={{ animationDelay: '0.05s' }}>
+          {/* Card 2: AI Credit Score */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
+            whileHover={{ y: -5, scale: 1.02 }}
+            className="p-6 rounded-3xl bg-slate-900/40 backdrop-blur-xl border border-primary/20 shadow-2xl shadow-primary/10 relative overflow-hidden group"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Invisible Credit Score</h3>
+                <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-medium text-muted-foreground">AI Predicted Credit Score</h3>
+                    <Badge variant="secondary" className="bg-primary/20 text-primary uppercase text-[10px] tabular-nums tracking-widest hidden sm:flex">
+                        Scikit-Learn ML
+                    </Badge>
+                </div>
                 <div className={`text-5xl font-bold mt-2 ${getScoreColor(scoreResult.score)}`}>
                   <AnimatedNumber value={scoreResult.score} />
                   <span className="text-lg font-normal text-muted-foreground">/100</span>
@@ -234,16 +284,31 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mt-4 border-t border-border pt-4">
+              <span className="text-sm text-muted-foreground">Prediction Confidence</span>
+              <div className="flex items-center gap-2">
+                <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 rounded-full" style={{width: `${mlData?.ml_metadata.prediction_confidence || 0}%`}} />
+                </div>
+                <span className="text-sm font-medium">{mlData?.ml_metadata.prediction_confidence || 0}%</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between mt-4">
               <span className="text-sm text-muted-foreground">Risk Level</span>
-              <Badge variant="outline" className={getRiskBadgeClass(scoreResult.riskLevel)}>
+              <Badge variant="outline" className={`bg-transparent ${getRiskBadgeClass(scoreResult.riskLevel)}`}>
                 {scoreResult.riskLevel} Risk
               </Badge>
             </div>
-          </div>
+          </motion.div>
 
           {/* Card 3: Lending Readiness */}
-          <div className="score-card animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="p-6 rounded-3xl bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 shadow-xl"
+          >
             <div className="flex items-start gap-4 mb-6">
               <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-accent-foreground" />
@@ -279,10 +344,15 @@ const Dashboard = () => {
                 </p>
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Card 5: Improvement Suggestions */}
-          <div className="score-card animate-slide-up" style={{ animationDelay: '0.15s' }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="p-6 rounded-3xl bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 shadow-xl"
+          >
             <div className="flex items-start gap-4 mb-6">
               <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
                 <Lightbulb className="w-6 h-6 text-accent-foreground" />
@@ -303,10 +373,15 @@ const Dashboard = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Card 4: Signal Breakdown - Full Width */}
-          <div className="score-card lg:col-span-2 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="lg:col-span-2 p-6 rounded-3xl bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 shadow-xl overflow-hidden"
+          >
             <div className="flex items-start gap-4 mb-6">
               <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
                 <FileText className="w-6 h-6 text-accent-foreground" />
@@ -353,22 +428,27 @@ const Dashboard = () => {
                 </tbody>
               </table>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Disclaimer */}
-        <div className="mt-8 p-6 bg-muted/30 rounded-xl border border-border animate-fade-in" style={{ animationDelay: '0.3s' }}>
+        <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-8 p-6 bg-slate-900/50 rounded-2xl border border-slate-800/50"
+        >
           <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
             <Shield className="w-4 h-4 text-primary" />
-            Why this score can be trusted
+            True Real-World Fintech Architecture
           </h4>
           <ul className="text-sm text-muted-foreground space-y-1">
-            <li>• Uses consent-based operational signals only</li>
-            <li>• No bank balances or transaction amounts are considered</li>
-            <li>• Explainable rule-based logic — no black box AI</li>
-            <li>• Acts as a pre-screening aid, not a loan approval decision-maker</li>
+            <li>• Powered by a <strong>Random Forest Regressor</strong> trained on hundreds of simulated records.</li>
+            <li>• Uses Account Aggregator (AA) proxies like Average Monthly Balance and Cheque Bounce rate.</li>
+            <li>• Uses GSTN/ Bureau proxies like ITR Filing Status and Bureau Vintage.</li>
+            <li>• Live predictions generated dynamically by a Python FastAPI Inference server.</li>
           </ul>
-        </div>
+        </motion.div>
       </main>
 
       {/* Footer */}
