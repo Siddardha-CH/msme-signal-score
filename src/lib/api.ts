@@ -1,129 +1,117 @@
 import { MSMERecord } from './types';
-import { useAuthStore } from '@/hooks/use-auth';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE = '/api';
+
+function getToken(): string | null {
+  try {
+    const raw = localStorage.getItem('msme-auth-storage');
+    return raw ? JSON.parse(raw)?.state?.token : null;
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(): HeadersInit {
+  const token = getToken();
+  return token
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    : { 'Content-Type': 'application/json' };
+}
+
+export async function login(username: string, password: string) {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!response.ok) throw new Error('Invalid credentials');
+  return response.json();
+}
+
+export async function fetchAllMSME(): Promise<MSMERecord[]> {
+  const response = await fetch(`${API_BASE}/msme`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('Failed to fetch MSME records');
+  return response.json();
+}
 
 export async function fetchMSME(gstin: string): Promise<MSMERecord> {
-  const response = await fetch(`${API_BASE_URL}/msme/${gstin}`);
+  const response = await fetch(`${API_BASE}/msme/${gstin}`, { headers: authHeaders() });
   if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error('MSME not found');
-    }
+    if (response.status === 404) throw new Error('MSME not found');
     throw new Error('Failed to fetch MSME data');
   }
   return response.json();
 }
 
 export async function createMSME(record: Omit<MSMERecord, 'last_updated'>): Promise<MSMERecord> {
-  const token = useAuthStore.getState().token;
-  const response = await fetch(`${API_BASE_URL}/msme`, {
+  const response = await fetch(`${API_BASE}/msme`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
+    headers: authHeaders(),
     body: JSON.stringify(record),
   });
-
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || 'Failed to create MSME record');
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as any).message || 'Failed to create MSME record');
   }
-
   return response.json();
 }
 
 export async function updateMSME(gstin: string, updates: Partial<MSMERecord>): Promise<MSMERecord> {
-  const token = useAuthStore.getState().token;
-  const response = await fetch(`${API_BASE_URL}/msme/${gstin}`, {
+  const response = await fetch(`${API_BASE}/msme/${gstin}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
+    headers: authHeaders(),
     body: JSON.stringify(updates),
   });
-
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || 'Failed to update MSME record');
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as any).message || 'Failed to update MSME record');
   }
-
   return response.json();
 }
 
-export interface MLScoreResult {
-  status: string;
+export interface ScoreResult {
   gstin: string;
-  predicted_score: number;
-  ml_metadata: {
-    model_type: string;
-    prediction_confidence: number;
-    version: string;
-  };
+  business_name: string;
+  score: number;
+  confidence: number;
+  grade: string;
+  factors: Record<string, number>;
 }
 
-export async function fetchMLScore(gstin: string): Promise<MLScoreResult> {
-  const response = await fetch(`${API_BASE_URL}/score/${gstin}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch ML score prediction');
-  }
-  return response.json();
-}
-
-export async function login(username: string, password: string) {
-  const response = await fetch(`${API_BASE_URL}/login`, {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ username, password })
-  });
-  
-  if (!response.ok) {
-    throw new Error('Invalid credentials');
-  }
+export async function fetchMLScore(gstin: string): Promise<ScoreResult> {
+  const response = await fetch(`${API_BASE}/msme/score/${gstin}`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('Failed to fetch score');
   return response.json();
 }
 
 export interface AppUser {
   username: string;
   role: string;
-  full_name?: string;
-  email?: string;
 }
 
+// Legacy compatibility — re-export MLScoreResult alias
+export type MLScoreResult = ScoreResult;
+
 export async function fetchUsers(): Promise<AppUser[]> {
-  const token = useAuthStore.getState().token;
-  const response = await fetch(`${API_BASE_URL}/users`, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  if (!response.ok) throw new Error('Failed to fetch users');
+  const response = await fetch(`${API_BASE}/users`, { headers: authHeaders() });
+  if (!response.ok) return [];
   return response.json();
 }
 
 export async function createUser(username: string, password: string, role: string): Promise<AppUser> {
-  const token = useAuthStore.getState().token;
-  const response = await fetch(`${API_BASE_URL}/users`, {
+  const response = await fetch(`${API_BASE}/users`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ username, password, role })
+    headers: authHeaders(),
+    body: JSON.stringify({ username, password, role }),
   });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to create user');
-  }
+  if (!response.ok) throw new Error('Failed to create user');
   return response.json();
 }
 
 export async function deleteUser(username: string): Promise<void> {
-  const token = useAuthStore.getState().token;
-  const response = await fetch(`${API_BASE_URL}/users/${username}`, {
+  const response = await fetch(`${API_BASE}/users/${username}`, {
     method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: authHeaders(),
   });
   if (!response.ok) throw new Error('Failed to delete user');
 }

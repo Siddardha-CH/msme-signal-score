@@ -1,6 +1,9 @@
 package com.msme.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "msme_records")
@@ -46,6 +49,10 @@ public class MsmeRecord {
     @Column(name = "monthly_revenue_trend")
     private double monthlyRevenueTrend;
 
+    @UpdateTimestamp
+    @Column(name = "last_updated")
+    private LocalDateTime lastUpdated;
+
     public Long getId() { return id; }
     public String getGstin() { return gstin; }
     public void setGstin(String g) { this.gstin = g; }
@@ -71,4 +78,6 @@ public class MsmeRecord {
     public void setCreditBureauVintage(int v) { this.creditBureauVintage = v; }
     public double getMonthlyRevenueTrend() { return monthlyRevenueTrend; }
     public void setMonthlyRevenueTrend(double v) { this.monthlyRevenueTrend = v; }
+    public LocalDateTime getLastUpdated() { return lastUpdated; }
+    public void setLastUpdated(LocalDateTime v) { this.lastUpdated = v; }
 }
